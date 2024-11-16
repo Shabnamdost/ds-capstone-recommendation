@@ -43,6 +43,47 @@ def build_model_nmf(n_components: int = 2000, max_iter: int = 1000) -> str:
     return file_name
 
 
+def recommended_movies(query, model, ratings, movies, k=5):
+    # Ensure movie_ids from the model match the ratings DataFrame columns
+    movie_ids = ratings.columns
+    
+    # Create a user vector with 0s for all movies the user hasn't rated
+    new_user_row = pd.Series(0, index=movie_ids)
+    
+    # Fill in the ratings from the query
+    for movie_id, rating in query.items():
+        if movie_id in movie_ids:
+            new_user_row[movie_id] = rating
+
+    # Reshape the row to create a single-row matrix for the model
+    new_user_matrix = new_user_row.values.reshape(1, -1)
+
+    # Transform the user vector using the NMF model to get the user-feature matrix P
+    P_new_user_matrix = model.transform(new_user_matrix)
+
+    # Reconstruct the user-movie matrix for the new user
+    Q_matrix = model.components_
+    R_hat_new_user_matrix = np.dot(P_new_user_matrix, Q_matrix)
+
+    # Create a DataFrame for predicted scores
+    predicted_scores = pd.DataFrame(R_hat_new_user_matrix, columns=movie_ids, index=["new_user"])
+
+    # Rank movies by predicted scores
+    ranked = predicted_scores.T.sort_values("new_user", ascending=False)
+
+    # Remove movies that the user has already rated
+    ranked = ranked[~ranked.index.isin(query.keys())]
+
+    # Get top-k recommendations
+    recommendations = ranked.head(k).reset_index()
+    recommendations.columns = ["movie_id", "score"]
+
+    # Merge with movie titles
+    recommendations = recommendations.merge(movies, on="movie_id")
+
+    return recommendations[["movie_id", "title", "score"]]
+
+
 ### space for Nearest Neighbor
 
 def main() -> None:
