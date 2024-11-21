@@ -75,9 +75,60 @@ def image_merger(image_paths, show_type):
         return merged_image_horizontal.show()
     else:
         return merged_image_vertical.show()
+# --------------------------------- Getting teh movie data ----------------
+def get_movie_data(movie_tmbd, api_key, save_directory='./images'):
+        # save_directory='./images'
+        """
+        Function to get movie poster's URLs and save the images locally.
+        
+        Parameters:
+        - movie_tmbd: list of int, a list of TMDB movie IDs.
+        - api_key: str, TMDB API key.
+        - save_directory: str, path to the directory where images will be saved (default is './images').
+
+        Returns:
+        - list_poster_url: list of str, list of poster URLs.
+        """
+        # movies_data = []
+        # Ensure the directory for saving images exists
+        if not os.path.exists(save_directory):
+            os.makedirs(save_directory)
+        # image_paths = []
+        # for movie_tmbd in movie_tmbds:
+            # print(f"Fetching poster for movie ID: {movie_tmbd}")
+        base_url = f'https://api.themoviedb.org/3/movie/{movie_tmbd}'
+
+        # Send a GET request to TMDB API
+        response = requests.get(base_url, params={'api_key': api_key})
+        # Check if the request was successful
+        if response.status_code == 200:
+            data = response.json()
+            poster_path = data.get('poster_path')
+            if poster_path:
+                poster_url = f'https://image.tmdb.org/t/p/w500{poster_path}'
+                    # list_poster_url.append(poster_url)
+
+                    # Send a GET request to the image URL
+                response_image = requests.get(poster_url)
+                image = Image.open(BytesIO(response_image.content))
+
+                # Save the image locally
+                image_path = os.path.join(save_directory, f"poster_tmbd_{movie_tmbd}.jpg")
+                image.save(image_path)
+                    # image_paths.append(image_path)
+                    # appending the data of the movie into the data list
+                # movies_data.append(data)
+                    # print(f"Saved poster for movie ID {movie_tmbd} at {image_path}")
+            else:
+                    print(f"Poster not found for movie ID {movie_tmbd}.")
+        else:
+            print(f"Failed to fetch movie details for ID {movie_tmbd}. Status code: {response.status_code}")
+
+        return image_path, data
+
 
 # -------------------------------- Getting the poster Paths ----------------
-def get_movie_posters(movie_tmbds, api_key, save_directory='./images'):
+def get_movies_data(movie_tmbds, api_key, save_directory='./images'):
         # save_directory='./images'
         """
         Function to get movie posters' URLs and save the images locally.
@@ -90,7 +141,7 @@ def get_movie_posters(movie_tmbds, api_key, save_directory='./images'):
         Returns:
         - list_poster_url: list of str, list of poster URLs.
         """
-        
+        movies_data = []
         # Ensure the directory for saving images exists
         if not os.path.exists(save_directory):
             os.makedirs(save_directory)
@@ -117,27 +168,26 @@ def get_movie_posters(movie_tmbds, api_key, save_directory='./images'):
                     image_path = os.path.join(save_directory, f"poster_tmbd_{movie_tmbd}.jpg")
                     image.save(image_path)
                     image_paths.append(image_path)
+                    # appending the data of the movie into the data list
+                    movies_data.append(data)
                     # print(f"Saved poster for movie ID {movie_tmbd} at {image_path}")
                 else:
                     print(f"Poster not found for movie ID {movie_tmbd}.")
             else:
                 print(f"Failed to fetch movie details for ID {movie_tmbd}. Status code: {response.status_code}")
 
-        return image_paths
+        return image_paths, movies_data
       
 
 
 #--------------------------------- Main Function -----------------------
-
-
-def recommender_nearest_neghibor(query, model_name, df_ratings, df_movies, df_links, k):
+def recommender_nearest_neghibor(query, model_name, df_ratings, df_movies, k):
         """ This function takes the query of new user and model trained and generates the poster of 
             recommended movies
             query: the rating info of the new user that is to be obtained in th stremlit app
             model: a pretarined model saved in the model directory of the main repo
             df_ratings: the table on the available ratings 
             df_movies: the table on the movies
-            df_links: the table contaiing the tmbdIds with which we get the posters of movies
             k: number of recommended movies"""
          # csr_matrix((data, (row_ind, col_ind)), [shape=(M, N)])
      # where data, row_ind and col_ind satisfy the relationship a[row_ind[k], col_ind[k]] = data[k].
@@ -197,18 +247,18 @@ def recommender_nearest_neghibor(query, model_name, df_ratings, df_movies, df_li
 
         # # getting the poster images and saving them in a directory 
         api_key = '32963fd453f575aa44262db989d926d6'
-        # image_paths = get_movie_posters(df_links.tmdbId.loc[recommendations.movieId], api_key)
+        # image_paths = get_movie_posters(df_movies.tmdbId.loc[recommendations.movieId], api_key)
 
         # return recommendations, image_merger(image_paths, 'hor')
-        movie_tmbds = df_links.tmdbId.loc[recommendations.movieId]
-        image_paths = get_movie_posters(movie_tmbds, api_key, save_directory='./images')
+        # movie_tmbds = df_movies.tmdbId.loc[recommendations.movieId]
+        # image_paths, movies_data = get_movies_data(movie_tmbds, api_key, save_directory='./images')
         # merging the images of movies
 
         # image_merger(image_paths, show_type = 'hor')
-        return recommendations, image_paths
+        return recommendations
 
 #------------------------------ NMF Recommender ----------------------
-def recommender_nmf(query, model_name, df_ratings, df_movies, df_links, k):
+def recommender_nmf(query, model_name, df_ratings, df_movies, k):
 
     # Create user vector
     df_new_user = pd.DataFrame(query, columns=df_movies["movieId"], index=["new_user"])
@@ -244,7 +294,7 @@ def recommender_nmf(query, model_name, df_ratings, df_movies, df_links, k):
     recommendations = df_movies[df_movies.movieId.isin(movie_ids)]
 
     # getting the poster images and saving them in a directory 
-    api_key = '32963fd453f575aa44262db989d926d6'
-    image_paths = get_movie_posters(df_links.tmdbId.loc[recommendations.movieId], api_key)
+    # api_key = '32963fd453f575aa44262db989d926d6'
+    # image_paths, movies_data = get_movies_data(df_movies.tmdbId.loc[recommendations.movieId], api_key)
     
-    return recommendations, image_paths
+    return recommendations
